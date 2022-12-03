@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text connection</title>
+</head>
+
+<body>
+  <h1>Test connection</h1>
+
+  <div id="content">
+    <!-- Login box -->
+    <div id="login_box">
+      <label for="URL">Connection URL</label>
+      <input type="text" name="url" value="ws://bamboojs.com:5280/xmpp" id="URL">
+
+      <br>
+
+      <label for="username">Username</label>
+      <input type="text" name="username" value="flyuser102@bamboojs.com" id="username">
+
+      <br>
+
+      <label for="password">Password</label>
+      <input type="password" name="password" value="123456" id="password">
+
+      <br>
+      <input type="checkbox" id="priority">Presence with priority</input>
+      <br>
+      <button id="connect_btn">Connect</button>
+    </div>
+
+    <!-- Connection done -->
+    <div id="roster">
+      <div>CONNECTED</div>
+      <button id="disconnect">Disconnect</button>
+
+      <div>
+        <label for="xmlinput">XMPP Stanza Input: </label> <br>
+        <textarea id="xmlinput" rows="15" cols="80"></textarea>
+        <br>
+        <button id="xmlinputsend">Send</button>
+      </div>
+    </div>
+
+    <div id="roster_content">
+    </div>
+  </div>
+
+</body>
+
+<script type="text/javascript" src="strophe.js"></script>
+<script type="text/javascript" src="strophe.rebind.js"></script>
+
+<script>
+  const URL = document.getElementById('URL').value
+  const username = document.getElementById('username').value
+  const password = document.getElementById('password').value
+  const connect_btn = document.getElementById('connect_btn')
+  const disconnect = document.getElementById('disconnect')
+  const roster = document.getElementById('roster')
+  const login_box = document.getElementById('login_box')
+  const xmlinput = document.getElementById('xmlinput')
+  const xmlinputsend = document.getElementById('xmlinputsend')
+  const roster_content = document.getElementById('roster_content')
+  const priority = document.getElementById('priority')
+
+  roster.style.display = 'none'
+
+  let con
+
+  // Create new Connection
+  const createConnection = () => {
+    con = new Strophe.Connection(URL)
+
+
+    if (0) {
+      con.rawInput = (str) => {
+        console.log('rawInput')
+        console.log(`%c ${str}`, 'background: #ffdddd;')
+      }
+      con.rawOutput = (str) => {
+        console.log('rawOutput')
+        console.log(`%c ${str}`, 'background: #ffdddd;')
+      }
+
+    } else {
+      con.xmlInput = (el) => {
+        console.log('xmlInput')
+        console.log(`%c ${Strophe.serialize(el)}`, 'background: #ffdddd;')
+      }
+      con.xmlOutput = (el) => {
+        console.log('xmlOutput')
+        console.log(`%c ${Strophe.serialize(el)}`, 'background: #ddffdd;')
+      }
+    }
+
+  }
+
+  // Rebind Or Connect
+  const rebindOrConnect = (url, jid, pass, sid, callback, onlyRebind) => {
+    createConnection()
+
+    con.rebind._rebind(jid, pass, sid, callback, onlyRebind)
+  }
+
+  const enableLogin = () => {
+    roster.style.display = 'none'
+    login_box.style.display = 'block'
+    connect_btn.removeAttribute('disabled')
+    disconnect.removeAttribute('disabled')
+  }
+  const enableRoster = () => {
+    roster.style.display = 'block'
+    login_box.style.display = 'none'
+    connect_btn.removeAttribute('disabled')
+    disconnect.removeAttribute('disabled')
+  }
+
+  const onRoster = (stanza) => {
+    [...stanza.querySelectorAll('item')].forEach(function (el) {
+      console.log('Stanza El', el)
+    })
+  }
+
+  // On Connect
+  const onConnect = (status) => {
+    if (status == Strophe.Status.CONNFAIL || status == Strophe.Status.AUTHFAIL) {
+      console.log("%c Connection error", 'background: red;')
+      enableLogin()
+    } else if (status == Strophe.Status.DISCONNECTED) {
+      console.log("%c Disconnected", 'background: red;')
+      enableLogin()
+    } else if (status == Strophe.Status.REBINDFAILED) {
+      console.log("%c Rebind failed", 'background: red;')
+      enableLogin()
+    } else if (status == Strophe.Status.CONNECTED || status == Strophe.Status.ATTACHED) {
+      console.log("%c Connected", 'background: green;')
+      enableRoster()
+
+      if (priority.value == 'on') {
+        con.send($pres().c("priority").t("1"))
+      } else {
+        con.send($pres())
+      }
+
+      con.sendIQ($iq({ type: "get" }).c("query", { xmlns: Strophe.NS.ROSTER }).tree(), onRoster)
+    }
+  }
+
+  Strophe.log = (level, str) => console.log("log", str)
+
+  // Connect Button Click
+  connect_btn.addEventListener('click', () => {
+    createConnection()
+    connect_btn.setAttribute('disabled', 'true')
+
+    rebindOrConnect(URL, username, password, null, onConnect)
+  })
+
+  // Send Message
+  xmlinputsend.addEventListener('click', () => {
+    console.log('Send Message')
+    con.send(Strophe.xmlHtmlNode(xmlinput.value).firstElementChild)
+  })
+
+  // Disconnect
+  disconnect.addEventListener('click', () => {
+    disconnect.setAttribute("disabled", "true")
+    con.disconnect()
+  })
+
+</script>
+
+
+</html>
